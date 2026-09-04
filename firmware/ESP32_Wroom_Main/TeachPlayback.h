@@ -22,6 +22,12 @@ class TeachPlayback {
   bool saveProgram(const char *name);
   bool loadProgram(const char *name);  // nạp vào bộ đệm waypoints_ hiện tại
 
+  // Nạp thẳng 1 chuỗi điểm (vd từ lệnh RUN_CYCLE/RUN_QUEUE của web) vào
+  // waypoints_ hiện tại, bỏ qua bước teach/ghi tay, để dùng lại nguyên
+  // startPlayback()/update() bên dưới. points[i] có AXIS_COUNT phần tử
+  // (X,Y,Z,A độ/mm + B,C độ servo), count bị kẹp trong kMaxWaypoints.
+  void loadAdHocSequence(const float points[][AXIS_COUNT], uint8_t count);
+
   bool startPlayback(MotorControl &motors, ServoControl &servos);
   void pausePlayback(MotorControl &motors);
   void resumePlayback(MotorControl &motors, ServoControl &servos);

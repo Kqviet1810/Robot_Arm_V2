@@ -4,6 +4,7 @@ import { Wifi, WifiOff } from "lucide-react";
 import ControlTab, { type Mode, type PayloadLog, type SavedCycle } from "./control";
 import HomeTab from "./home";
 import SettingTab, { type GoHomeMode } from "./setting";
+import { useEspLink } from "./espLink";
 
 type TabKey = "home" | "control" | "settings";
 
@@ -40,8 +41,9 @@ function TabButton({
 
 export default function RobotControlMain() {
   const [activeTab, setActiveTab] = useState<TabKey>("control");
-  const [connected, setConnected] = useState(true);
-  const [ip] = useState("192.168.4.1");
+  const espLink = useEspLink();
+  const connected = espLink.connected;
+  const [ip, setIp] = useState("192.168.4.1");
   const [port] = useState("80");
 
   const [joints, setJoints] = useState<number[]>([82, -9, 0, -34, 90, 66]);
@@ -80,6 +82,14 @@ export default function RobotControlMain() {
     localStorage.setItem("robot_cycles_production_v3", JSON.stringify(cycles));
   }, [cycles]);
 
+  // Cap nhat pose tren UI theo trang thai that tu ESP32 (quan trong khi
+  // robot tu chay HOME/RUN_CYCLE/RUN_QUEUE, khong phai do keo slider).
+  useEffect(() => {
+    if (espLink.lastStatus && espLink.lastStatus.p.length === 6) {
+      setJoints(espLink.lastStatus.p);
+    }
+  }, [espLink.lastStatus]);
+
   const poseSummary = useMemo(
     () => joints.map((v, i) => `J${i + 1}:${Math.round(v)} deg`).join(" | "),
     [joints]
@@ -100,7 +110,7 @@ export default function RobotControlMain() {
     setLastCommandLabel(label);
     setLogs((prev) => [{ time: now, payload: packet }, ...prev].slice(0, 80));
 
-    console.log("SEND:", packet);
+    espLink.send(payload);
   }
 
   function buildPosePacket(pose: number[], mode: "live" | "manual") {
@@ -347,7 +357,7 @@ export default function RobotControlMain() {
                 }`}
               >
                 {connected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-                {connected ? "ESP32: Da ket noi" : "ESP32: Ngat ket noi"}
+                {connected ? "ESP32: Da ket noi" : espLink.connecting ? "ESP32: Dang ket noi..." : "ESP32: Ngat ket noi"}
               </div>
               <div className="text-sm text-white/60">
                 IP: {ip} | Port: {port}
@@ -356,13 +366,14 @@ export default function RobotControlMain() {
 
             <div className="flex items-center gap-2">
               <button
+                disabled={!connected}
                 onClick={() => writeEspPacket({ cmd: "PING" }, "Ping ESP32")}
-                className="rounded-xl bg-white/6 px-3 py-2 text-sm text-white hover:bg-white/10"
+                className="rounded-xl bg-white/6 px-3 py-2 text-sm text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Ping
               </button>
               <button
-                onClick={() => setConnected((state) => !state)}
+                onClick={() => (connected ? espLink.disconnect() : espLink.connect(ip, port))}
                 className="rounded-xl bg-white/6 px-3 py-2 text-sm text-white hover:bg-white/10"
               >
                 {connected ? "Ngat" : "Ket noi"}
@@ -390,6 +401,7 @@ export default function RobotControlMain() {
         {activeTab === "settings" && (
           <SettingTab
             ip={ip}
+            setIp={setIp}
             port={port}
             goHomeMode={goHomeMode}
             setGoHomeMode={setGoHomeMode}

@@ -77,6 +77,14 @@ bool TeachPlayback::loadProgram(const char *name) {
   return true;
 }
 
+void TeachPlayback::loadAdHocSequence(const float points[][AXIS_COUNT], uint8_t count) {
+  if (count > kMaxWaypoints) count = kMaxWaypoints;
+  for (uint8_t i = 0; i < count; i++) {
+    memcpy(waypoints_[i].axisPos, points[i], sizeof(waypoints_[i].axisPos));
+  }
+  count_ = count;
+}
+
 bool TeachPlayback::startPlayback(MotorControl &motors, ServoControl &servos) {
   if (teaching_ || count_ == 0) return false;
   playing_ = true;

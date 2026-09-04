@@ -5,7 +5,7 @@ trong đó A là trục ray trượt dùng đai GT2), điều khiển bởi 3 bo
 
 | Board | Vai trò | Giao tiếp |
 |---|---|---|
-| ESP32 Wroom (Main) | Điều khiển 4 stepper (TMC2209/UART) + 2 servo SG90 | UART ↔ C3, ESP-NOW ↔ CYD |
+| ESP32 Wroom (Main) | Điều khiển 4 stepper (TMC2209/UART) + 2 servo SG90 | UART ↔ C3, ESP-NOW ↔ CYD, WiFi SoftAP + WebSocket ↔ web |
 | ESP32 C3 Super Mini | Đọc 4 cảm biến AS5600 qua TCA9548A | UART ↔ Wroom, ESP-NOW → CYD |
 | ESP32 CYD (ESP32-2432S028, 2.8" ILI9341 + XPT2046) | Màn hình điều khiển (HMI) | ESP-NOW ↔ Wroom/C3 |
 
@@ -38,6 +38,9 @@ sketch (UART frame Wroom↔C3, gói tin ESP-NOW). Copy thư mục này vào
 - **XPT2046_Touchscreen** (Paul Stoffregen) — cảm ứng điện trở trên CYD, dùng
   chung bus SPI mặc định với TFT (MISO12/MOSI13/SCLK14 cũng là chân VSPI mặc
   định của ESP32 nên không cần cấu hình SPI riêng).
+- **ESPAsyncWebServer** + **AsyncTCP** — server HTTP tĩnh (LittleFS) + WebSocket
+  bất đồng bộ trên Wroom, phục vụ web dashboard (không chặn `loop()` chính).
+- **ArduinoJson** (v7.x) — parse/serialize JSON cho giao thức WebSocket Wroom↔web.
 
 > Sau khi nạp lần đầu, mở Serial Monitor và chạm 4 góc màn hình để xem giá
 > trị thô từ `ts.getPoint()` (có thể tạm thêm `Serial.println` trong
@@ -114,12 +117,60 @@ chỉnh — sửa ở đó khi cần tinh chỉnh phần cứng thực tế, kh�
   - Wroom → CYD: `StatusMsg` (trạng thái hệ thống, vị trí lệnh, lỗi/stall, SG_RESULT).
   - CYD → Wroom: `CommandMsg` (jog, home, teach/playback, E-Stop).
 
+## Kết nối Web dashboard (WebSocket thời gian thực)
+
+Repo gốc (`../`) là web dashboard React điều khiển robot. ESP32 Wroom chạy
+**WiFi SoftAP** (không phải join WiFi nhà bạn) + tự phục vụ luôn giao diện
+web đã build qua LittleFS, để trình duyệt kết nối trực tiếp — không cần
+Internet, không dính lỗi "mixed content" (trang `https://` không thể mở
+`ws://` tới IP nội bộ).
+
+**Vì sao KHÔNG dùng link GitHub Pages để điều khiển thật**: khi điện thoại/
+laptop join vào WiFi của robot (không có Internet) sẽ mất route ra ngoài,
+không mở được trang GitHub Pages nữa; và kể cả mở được, trình duyệt chặn
+`ws://` (không mã hoá) trên trang tải qua `https://`. Do đó:
+- **GitHub Pages** (`https://kqviet1810.github.io/Robot_Arm_V2/`) chỉ để
+  **xem trước giao diện**, không điều khiển được robot thật.
+- **`http://192.168.4.1/`** (ESP32 tự phục vụ) mới là nơi **điều khiển
+  thật** — cùng origin với WebSocket nên không bị chặn.
+
+**Bước cài đặt (1 lần, mỗi khi web dashboard thay đổi):**
+1. Ở thư mục gốc repo: `npm install && npm run build`.
+2. Copy toàn bộ nội dung `dist/*` vào `firmware/ESP32_Wroom_Main/data/`
+   (thư mục này đã có sẵn bản build hiện tại, chỉ cần làm lại khi sửa web).
+3. Trong Arduino IDE, cài plugin **"ESP32 Sketch Data Upload"** (hoặc dùng
+   `arduino-cli`/`mklittlefs` tương đương), mở sketch `ESP32_Wroom_Main`,
+   chạy công cụ này để upload `data/` lên LittleFS của board.
+4. Nạp sketch `ESP32_Wroom_Main` như bình thường.
+5. Trên điện thoại/laptop, join WiFi tên **`RobotArmV2`** (mật khẩu
+   `robotarm123`, đổi trong `Config.h` nếu cần), mở trình duyệt tới
+   `http://192.168.4.1/`.
+
+**Giao thức WebSocket** (`ws://192.168.4.1/ws`, JSON) — xem chi tiết trong
+`ESP32_Wroom_Main/StateMachine.cpp` (`handleWebCommand`) và
+`src/robot/espLink.ts` phía web:
+- Web → Wroom: `{cmd:"J"|"START", p:[j1..j6], v, a}` (di chuyển ngay),
+  `{cmd:"HOME"}` (home thật bằng StallGuard), `{cmd:"ESTOP"}`, `{cmd:"PING"}`,
+  `{cmd:"RUN_CYCLE", pts:[[..6 số..],...]}` / `{cmd:"RUN_QUEUE", items:[...]}`
+  (phát lại chuỗi điểm, dùng lại máy trạng thái Teach & Playback có sẵn).
+- Wroom → web: phát định kỳ (~10Hz)
+  `{"type":"status","state":...,"p":[j1..j6],"moving":bool,"fault":n}`.
+
+**Kênh WiFi cố định**: vì Wroom chuyển từ STA sang AP, đã pin cứng kênh
+WiFi (`WIFI_AP_CHANNEL`, mặc định 6) ở cả 3 board để ESP-NOW Wroom↔C3/CYD
+không bị lệch kênh — nếu đổi kênh, phải sửa đồng bộ ở cả `ESP32_Wroom_Main`,
+`ESP32_C3_Sensor` và `ESP32_CYD_HMI` (`Config.h` mỗi board).
+
 ## Trạng thái triển khai
 
 - [x] Khung thư mục + thư viện giao thức dùng chung
 - [x] ESP32_C3_Sensor: đọc AS5600/TCA9548A, UART, ESP-NOW telemetry
 - [x] ESP32_Wroom_Main: TMC2209/StallGuard homing, servo, teach & playback, ESP-NOW/UART
 - [x] ESP32_CYD_HMI: giao diện LVGL (Home/Jog/Teach/Diagnostics), ESP-NOW
+- [x] Kết nối thật Web ↔ Wroom qua WiFi SoftAP + WebSocket (LinkWeb.h),
+      web tự phục vụ từ LittleFS, đã kiểm chứng phía web bằng mock server +
+      Playwright (xem `README.md` gốc) — phía firmware chưa chạy được trên
+      phần cứng thật trong môi trường này (xem mục dưới).
 - [ ] Biên dịch thử bằng arduino-cli: môi trường phát triển này bị chặn tải
       gói `esp32:esp32` (mạng ra ngoài giới hạn theo whitelist), nên KHÔNG
       build-check được tự động. Code đã được rà soát thủ công kỹ theo API
@@ -141,3 +192,11 @@ chỉnh — sửa ở đó khi cần tinh chỉnh phần cứng thực tế, kh�
   nhưng sẽ chậm hơn nếu sau này cần tối ưu thời gian home.
 - lv_conf.h phải tồn tại và đặt đúng `LV_COLOR_DEPTH 16` (xem mục thư viện ở trên), nếu không sketch CYD sẽ không biên dịch được.
 - Hiệu chỉnh vùng chạm XPT2046 (`TOUCH_RAW_X/Y_MIN/MAX` trong `ESP32_CYD_HMI/Config.h`) theo board thật.
+- Web hiện chỉ hỗ trợ "GoHome mode: dùng gốc mặc định ESP32" (home thật qua
+  StallGuard); tuỳ chọn "Về vị trí trước đó" trong Settings web CHƯA nối
+  logic thật (firmware luôn home thật khi nhận `{cmd:"HOME"}`, bỏ qua field
+  `gh` trong gói tin).
+- RUN_CYCLE/RUN_QUEUE từ web nạp thẳng vào bộ đệm waypoint dùng chung với
+  Teach & Playback (`loadAdHocSequence`) rồi phát tuần tự — không đồng bộ
+  thời gian đến giữa các trục theo kiểu nội suy tuyến tính thật, mỗi trục
+  tự chạy theo tốc độ/gia tốc riêng tới khi tất cả dừng mới sang điểm kế.

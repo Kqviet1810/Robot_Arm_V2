@@ -34,6 +34,11 @@ static const int TOUCH_RAW_Y_MAX = 3800;
 static const uint32_t COMMAND_KEEPALIVE_INTERVAL_MS = 150;  // gửi lại JOG_START khi giữ nút
 static const uint32_t LINK_FRESH_TIMEOUT_MS = 800;
 
+// ESP32 Wroom chạy WiFi SoftAP (phục vụ web dashboard) trên kênh cố định —
+// CYD phải pin đúng kênh này thì ESP-NOW mới nhận được (xem WIFI_AP_CHANNEL
+// trong ESP32_Wroom_Main/Config.h, PHẢI khớp giá trị).
+static const uint8_t WIFI_AP_CHANNEL = 6;
+
 // --- Jog ---
 static const uint8_t JOG_SPEED_SLOW_PCT = 30;
 static const uint8_t JOG_SPEED_FAST_PCT = 100;

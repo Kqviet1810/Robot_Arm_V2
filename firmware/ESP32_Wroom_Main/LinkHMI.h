@@ -12,8 +12,11 @@
 // để chuyển lệnh sang loop() chính một cách an toàn, không cần mutex.
 class LinkHMI {
  public:
+  // LƯU Ý: WiFi.mode() không gọi ở đây — LinkWeb::begin() đã set WIFI_AP
+  // (SoftAP phục vụ web dashboard) TRƯỚC khi hàm này chạy; ESP-NOW hoạt
+  // động bình thường trên nền AP, chỉ cần đúng thứ tự khởi tạo trong
+  // StateMachine::begin() (linkWeb_.begin() trước linkHMI_.begin()).
   bool begin() {
-    WiFi.mode(WIFI_STA);
     if (esp_now_init() != ESP_OK) return false;
 
     esp_now_peer_info_t peer = {};

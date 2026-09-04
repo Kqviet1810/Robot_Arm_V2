@@ -25,3 +25,8 @@ static const uint32_t ANGLE_REPORT_INTERVAL_MS = 20;   // ~50Hz gửi Wroom
 
 // --- ESP-NOW -> CYD (telemetry giám sát) ---
 static const uint32_t TELEMETRY_INTERVAL_MS = 100;     // ~10Hz gửi CYD
+
+// ESP32 Wroom giờ chạy WiFi SoftAP (phục vụ web dashboard) thay vì STA, trên
+// kênh cố định — C3 phải pin đúng kênh này thì ESP-NOW mới nhận được
+// (xem WIFI_AP_CHANNEL trong ESP32_Wroom_Main/Config.h, PHẢI khớp giá trị).
+static const uint8_t WIFI_AP_CHANNEL = 6;

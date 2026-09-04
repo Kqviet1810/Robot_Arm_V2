@@ -95,10 +95,21 @@ static const float ACCEL_DEG_S2 = 120.0f;
 static const float ACCEL_MM_S2 = 80.0f;
 
 // --- Teach & Playback ---
-static const uint8_t MAX_WAYPOINTS = 50;
+// 200 điểm đủ cho teach thủ công lẫn RUN_CYCLE/RUN_QUEUE gộp nhiều chu
+// trình từ web (chi phí RAM không đáng kể: 200 * 6 float = 4.8KB).
+static const uint8_t MAX_WAYPOINTS = 200;
 static const float PLAYBACK_POSITION_TOLERANCE_DEG = 1.0f;
 
 // --- An toàn ---
 // Nếu không nhận CommandMsg mới trong lúc jog quá thời gian này -> tự dừng.
 static const uint32_t JOG_KEEPALIVE_TIMEOUT_MS = 300;
 static const uint32_t STATUS_SEND_INTERVAL_MS = 100;
+
+// --- WiFi SoftAP + WebSocket (kết nối trực tiếp từ web dashboard) ---
+// Đổi mật khẩu trước khi dùng thật nếu cần bảo mật cao hơn (>= 8 ký tự).
+static const char *const WIFI_AP_SSID = "RobotArmV2";
+static const char *const WIFI_AP_PASSWORD = "robotarm123";
+// Kênh WiFi cố định để ESP-NOW với C3/CYD không bị lệch kênh khi Wroom
+// chuyển sang chạy AP (thay vì STA mặc định) — C3/CYD phải pin cùng kênh
+// này (xem WIFI_AP_CHANNEL trong Config.h của 2 board đó).
+static const uint8_t WIFI_AP_CHANNEL = 6;

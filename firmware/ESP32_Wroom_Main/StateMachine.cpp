@@ -5,6 +5,9 @@ void StateMachine::begin() {
   servos_.begin();
   linkC3_.begin();
   teach_.begin();
+  // LinkWeb phải begin() TRƯỚC LinkHMI: LinkWeb set WiFi.mode(WIFI_AP) +
+  // kênh cố định, ESP-NOW (LinkHMI) chạy tiếp trên nền AP đó.
+  linkWeb_.begin();
   if (!linkHMI_.begin()) {
     Serial.println("[Wroom] Loi khoi tao ESP-NOW");
   }
@@ -14,10 +17,14 @@ void StateMachine::begin() {
 void StateMachine::update() {
   motors_.update();
   linkC3_.update();
+  linkWeb_.update();
   teach_.update(motors_, servos_);
 
   CommandMsg cmd;
   while (linkHMI_.popCommand(cmd)) handleCommand(cmd);
+
+  String webJson;
+  while (linkWeb_.popCommand(webJson)) handleWebCommand(webJson);
 
   checkJogWatchdog();
   checkRuntimeFaults();
@@ -183,4 +190,92 @@ void StateMachine::sendStatus() {
   msg.playTotal = teach_.playTotal();
   msg.loopEnabled = teach_.loopEnabled() ? 1 : 0;
   linkHMI_.sendStatus(msg);
+
+  // Cùng dữ liệu, đóng gói JSON gửi cho web qua WebSocket.
+  static const char *const kStateNames[] = {"IDLE", "HOMING", "JOG", "TEACH_RECORD", "TEACH_PLAY", "ERROR"};
+  JsonDocument doc;
+  doc["type"] = "status";
+  doc["state"] = kStateNames[state_ <= STATE_ERROR ? state_ : 0];
+  doc["moving"] = motors_.isAnyMoving();
+  doc["fault"] = errorAxisMask_;
+  JsonArray p = doc["p"].to<JsonArray>();
+  for (uint8_t i = 0; i < AXIS_STEPPER_COUNT; i++) p.add(motors_.getPositionUnits(i));
+  p.add(servos_.getDeg(0));
+  p.add(servos_.getDeg(1));
+  String json;
+  serializeJson(doc, json);
+  linkWeb_.broadcastStatus(json);
+}
+
+// Đếm & sao chép tối đa `maxCount` điểm (mỗi điểm AXIS_COUNT số) từ mảng
+// JSON `pts` (dạng [[j1..j6], [j1..j6], ...]) vào `out`. Dùng chung cho
+// RUN_CYCLE và RUN_QUEUE.
+static uint8_t collectPoints(JsonArrayConst pts, float out[][AXIS_COUNT], uint8_t maxCount) {
+  uint8_t n = 0;
+  for (JsonArrayConst pose : pts) {
+    if (n >= maxCount) break;
+    for (uint8_t i = 0; i < AXIS_COUNT && i < pose.size(); i++) out[n][i] = pose[i].as<float>();
+    n++;
+  }
+  return n;
+}
+
+void StateMachine::handleWebCommand(const String &json) {
+  JsonDocument doc;
+  if (deserializeJson(doc, json) != DeserializationError::Ok) return;
+
+  const char *cmd = doc["cmd"] | "";
+
+  if (strcmp(cmd, "J") == 0 || strcmp(cmd, "START") == 0) {
+    if (strcmp(cmd, "START") == 0) {
+      motors_.clearEStop();
+      errorAxisMask_ = 0;
+      if (state_ == STATE_ERROR) state_ = STATE_IDLE;
+    }
+    JsonArrayConst p = doc["p"];
+    if (p.size() >= AXIS_COUNT && state_ != STATE_TEACH_RECORD && state_ != STATE_TEACH_PLAY) {
+      for (uint8_t i = 0; i < AXIS_STEPPER_COUNT; i++) motors_.moveTo(i, p[i].as<float>());
+      servos_.setDeg(0, p[AXIS_B].as<float>());
+      servos_.setDeg(1, p[AXIS_C].as<float>());
+    }
+
+  } else if (strcmp(cmd, "HOME") == 0) {
+    if (state_ != STATE_TEACH_RECORD && state_ != STATE_TEACH_PLAY) {
+      state_ = STATE_HOMING;
+      bool allOk = true;
+      for (uint8_t i = 0; i < AXIS_STEPPER_COUNT; i++) {
+        if (!motors_.homeAxis(i)) {
+          allOk = false;
+          errorAxisMask_ |= (1 << i);
+        }
+      }
+      state_ = allOk ? STATE_IDLE : STATE_ERROR;
+    }
+
+  } else if (strcmp(cmd, "ESTOP") == 0) {
+    motors_.requestEStop();
+    teach_.stopPlayback(motors_);
+    errorAxisMask_ = 0xFF;
+    state_ = STATE_ERROR;
+
+  } else if (strcmp(cmd, "PING") == 0) {
+    sendStatus();
+
+  } else if (strcmp(cmd, "RUN_CYCLE") == 0 || strcmp(cmd, "RUN_QUEUE") == 0) {
+    if (state_ == STATE_IDLE) {
+      uint8_t count = 0;
+      if (strcmp(cmd, "RUN_CYCLE") == 0) {
+        count = collectPoints(doc["pts"], webPointsBuf_, MAX_WAYPOINTS);
+      } else {
+        for (JsonObjectConst item : doc["items"].as<JsonArrayConst>()) {
+          if (count >= MAX_WAYPOINTS) break;
+          count += collectPoints(item["pts"], &webPointsBuf_[count], (uint8_t)(MAX_WAYPOINTS - count));
+        }
+      }
+      if (count > 0) {
+        teach_.loadAdHocSequence(webPointsBuf_, count);
+        if (teach_.startPlayback(motors_, servos_)) state_ = STATE_TEACH_PLAY;
+      }
+    }
+  }
 }

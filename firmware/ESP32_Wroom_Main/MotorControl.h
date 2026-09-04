@@ -42,6 +42,14 @@ class MotorControl {
   // theo dõi.
   void moveTo(uint8_t axisIdx, float targetUnits);
   bool isMoving(uint8_t axisIdx) const;
+  // true nếu bất kỳ trục stepper nào đang di chuyển — dùng cho status JSON
+  // gửi web (độc lập với RobotState/jogging_ để không đụng logic ESP-NOW).
+  bool isAnyMoving() const {
+    for (uint8_t i = 0; i < AXIS_STEPPER_COUNT; i++) {
+      if (steppers_[i] && steppers_[i]->isRunning()) return true;
+    }
+    return false;
+  }
   // Chờ tới khi trục dừng hoặc hết timeout/E-Stop. Trả về true nếu dừng vì
   // đã tới đích (không phải timeout/E-Stop).
   bool waitUntilIdle(uint8_t axisIdx, uint32_t timeoutMs);
