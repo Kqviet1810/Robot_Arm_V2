@@ -1,69 +1,45 @@
-# React + TypeScript + Vite
+# Robot Arm V2
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Dự án cánh tay robot 6 bậc tự do (6-DOF) + 1 trục ray trượt, điều khiển bởi
+3 vi xử lý ESP32 phối hợp (Wroom, C3 Super Mini, CYD). Chi tiết kiến trúc,
+sơ đồ chân, giao thức và hướng dẫn nạp firmware xem tại
+[`firmware/README.md`](firmware/README.md).
 
-Currently, two official plugins are available:
+## Web — Bảng điều khiển (dashboard)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Thư mục gốc của repo là 1 ứng dụng web (React 19 + TypeScript + Vite +
+Tailwind CSS v4) làm giao diện điều khiển robot từ trình duyệt.
 
-## Expanding the ESLint configuration
+- **Live demo**: https://kqviet1810.github.io/Robot_Arm_V2/
+  (tự động build & deploy qua GitHub Actions mỗi khi có commit mới trên
+  nhánh `main` — xem `.github/workflows/deploy-pages.yml`)
+- **Chạy local**:
+  ```bash
+  npm install
+  npm run dev
+  ```
+- **Build production**: `npm run build` (kết quả ở `dist/`)
+- **Kiểm tra code**: `npm run lint`
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Trạng thái hiện tại: UI demo, CHƯA điều khiển robot thật
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Toàn bộ nút bấm (jog khớp, Home, Start/Stop, lưu & phát chu trình...) đã
+hoạt động đầy đủ về mặt giao diện và được ghi lại trong khung "Log điều
+khiển", nhưng **chưa gửi bất kỳ lệnh nào qua mạng tới ESP32** — hàm
+`writeEspPacket()` (`src/robot/main.tsx`) hiện chỉ log lại cục bộ. Để điều
+khiển robot thật, cần thêm ở firmware (Wroom) một WiFi Access Point +
+HTTP/WebSocket server nhận đúng định dạng lệnh JSON mà web đang gửi
+(`{cmd, p, v, a, ...}`), việc này sẽ làm ở giai đoạn sau.
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+### Cấu trúc thư mục web
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+src/
+  App.tsx, main.tsx        # điểm vào ứng dụng
+  robot/
+    main.tsx               # state tổng, ghép 3 tab, gửi/ghi log lệnh
+    home.tsx                # tab Trang chủ
+    control.tsx             # tab Điều khiển (jog khớp, servo, chu trình)
+    setting.tsx              # tab Cài đặt (GoHome)
+    ui.tsx                    # component dùng chung (Card)
 ```

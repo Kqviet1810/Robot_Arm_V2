@@ -1,5 +1,6 @@
 ﻿import { Activity, Wifi, WifiOff, Zap } from "lucide-react";
-import type { ComponentType, ReactNode } from "react";
+import type { ComponentType } from "react";
+import { Card } from "./ui";
 
 type Tone = "default" | "good" | "warn";
 
@@ -8,26 +9,6 @@ type HomeTabProps = {
   jointSpeed: number;
   poseSummary: string;
 };
-
-function Card({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
-      <div className="mb-3">
-        <h3 className="text-[15px] font-semibold text-white">{title}</h3>
-        {subtitle ? <p className="mt-1 text-xs text-white/55">{subtitle}</p> : null}
-      </div>
-      {children}
-    </section>
-  );
-}
 
 function TinyStat({
   icon: Icon,

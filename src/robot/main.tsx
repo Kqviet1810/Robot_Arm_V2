@@ -178,26 +178,28 @@ export default function RobotControlMain() {
     if (actionLocked) return;
     const pose = [0, 0, 0, 0, 90, 90];
     setJoints(pose);
-    writeEspPacket({ cmd: "HOME", p: pose }, "Home chuan");
+    if (connected) writeEspPacket({ cmd: "HOME", p: pose }, "Home chuan");
   }
 
   function handleSendPose() {
     if (actionLocked) return;
-    writeEspPacket(buildPosePacket(joints, "manual"), "Gui pose hien tai");
+    if (connected) writeEspPacket(buildPosePacket(joints, "manual"), "Gui pose hien tai");
   }
 
   function handleStart() {
     if (controlsLocked) setControlsLocked(false);
-    writeEspPacket(
-      {
-        cmd: "START",
-        p: roundPose(joints),
-        v: jointSpeed,
-        a: jointAccel,
-        m: controlMode,
-      },
-      controlsLocked ? "Mo dieu khien va Start" : `Start @ ${jointSpeed} deg/s`
-    );
+    if (connected) {
+      writeEspPacket(
+        {
+          cmd: "START",
+          p: roundPose(joints),
+          v: jointSpeed,
+          a: jointAccel,
+          m: controlMode,
+        },
+        controlsLocked ? "Mo dieu khien va Start" : `Start @ ${jointSpeed} deg/s`
+      );
+    }
   }
 
   function handleStop() {
