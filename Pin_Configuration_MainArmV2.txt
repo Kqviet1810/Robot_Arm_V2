@@ -1,0 +1,60 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║         MAIN ARM V2 - PIN CONFIGURATION & STEPPER MOTORS            ║
+║                      ESP32 Arduino IDE Code                         ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════
+STEPPER MOTORS - TMC2209 (Stepping Motor)
+═══════════════════════════════════════════════════════════════════════
+
+[MOTOR X - AXIS X]
+  Step Pin:      GPIO 14
+  Direction Pin: GPIO 27
+  Limit Pin:     GPIO 35 (Negative Limit)
+
+[MOTOR Y - AXIS Y]
+  Step Pin:      GPIO 26
+  Direction Pin: GPIO 25
+  Limit Pin:     GPIO 34 (Negative Limit)
+
+[MOTOR Z - AXIS Z]
+  Step Pin:      GPIO 18
+  Direction Pin: GPIO 4
+  Limit Pin:     GPIO 36 (Negative Limit)
+
+[MOTOR A - AXIS A]
+  Step Pin:      GPIO 21
+  Direction Pin: GPIO 19
+  Limit Pin:     GPIO 39 (Positive Limit)
+
+═══════════════════════════════════════════════════════════════════════
+SERVO MOTORS (Servo Motor)
+═══════════════════════════════════════════════════════════════════════
+
+[SERVO B - AXIS B]
+  Control Pin:   GPIO 32 ( Xoay kẹp )
+
+[SERVO C - AXIS C ] 
+  Control Pin:   GPIO 33 ( Kẹp )
+
+═══════════════════════════════════════════════════════════════════════
+SERIAL COMMUNICATION - UART
+═══════════════════════════════════════════════════════════════════════
+
+[UART 1 - Stepper Motors Communication (TMC2209)]
+  Baud Rate:     115200
+  TXD Pin:       GPIO 23
+  RXD Pin:       GPIO 22
+  Function:      Giao tiếp với tất cả motor stepping qua UART
+
+[UART 2 - Main ESP32 Communication]
+  Baud Rate:     115200
+  TXD Pin:       GPIO 17
+  RXD Pin:       GPIO 16
+  Function:      Giao tiếp với ESP32 chính
+
+[ESP32 C3 - Secondary Controller]
+  Baud Rate:     115200
+  RXD Pin:       GPIO 4
+  TXD Pin:       GPIO 3
+  Function:      Bộ điều khiển phụ
